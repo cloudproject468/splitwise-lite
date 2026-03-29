@@ -1,1 +1,10 @@
-node_modules/\n.env\n*.db\n__pycache__/
+node_modules/
+.env
+*.db
+__pycache__/
+backend/venv/
+frontend/node_modules/
+dist/
+build/
+*.pyc
+.DS_Store
