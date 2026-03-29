@@ -1,0 +1,15 @@
+[Unit]
+Description=Budget Tracker API
+After=network.target
+
+[Service]
+Type=simple
+User=claude
+WorkingDirectory=/home/claude/budget-app/backend
+ExecStart=/home/claude/budget-app/backend/venv/bin/python app.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
