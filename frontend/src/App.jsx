@@ -4,7 +4,7 @@ import Balance from './components/Balance'
 import ExpenseList from './components/ExpenseList'
 import Stats from './components/Stats'
 
-const API = '/api'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 function App() {
   const [view, setView] = useState('balance')

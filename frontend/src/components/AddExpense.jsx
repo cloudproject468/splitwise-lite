@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 
-const API = '/api'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 const CATEGORIES = ['groceries', 'dining', 'utilities', 'transport', 'entertainment', 'other']
 
