@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 import os
+import hashlib
 import shutil
 import pytesseract
 from PIL import Image
@@ -20,10 +21,26 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Budget Tracker")
 
+# --- PIN Auth ---
+# Set via env var BUDGET_PIN, default "1234" (change in production!)
+BUDGET_PIN_HASH = hashlib.sha256(
+    os.getenv("BUDGET_PIN", "1234").encode()
+).hexdigest()
+
+async def verify_pin(request: Request):
+    """Check X-Budget-Pin header against stored hash."""
+    pin = request.headers.get("X-Budget-Pin", "")
+    if hashlib.sha256(pin.encode()).hexdigest() != BUDGET_PIN_HASH:
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten in production
+    allow_origins=[
+        "https://cloudproject468.github.io",
+        "https://104-129-51-150.sslip.io",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,8 +82,16 @@ class ExpenseResponse(BaseModel):
 def root():
     return {"status": "Budget Tracker API running"}
 
+@app.post("/auth/verify")
+async def auth_verify(request: Request):
+    """Verify a PIN without needing any other data."""
+    pin = request.headers.get("X-Budget-Pin", "")
+    if hashlib.sha256(pin.encode()).hexdigest() != BUDGET_PIN_HASH:
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+    return {"status": "ok"}
+
 # Users
-@app.post("/users")
+@app.post("/users", dependencies=[Depends(verify_pin)])
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.name == user.name).first()
     if existing:
@@ -77,12 +102,12 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-@app.get("/users")
+@app.get("/users", dependencies=[Depends(verify_pin)])
 def get_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
 # Expenses
-@app.post("/expenses")
+@app.post("/expenses", dependencies=[Depends(verify_pin)])
 def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
     db_expense = Expense(
         amount=expense.amount,
@@ -109,7 +134,7 @@ def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
 
     return db_expense
 
-@app.get("/expenses")
+@app.get("/expenses", dependencies=[Depends(verify_pin)])
 def get_expenses(db: Session = Depends(get_db)):
     expenses = db.query(Expense).order_by(Expense.created_at.desc()).all()
     result = []
@@ -129,7 +154,7 @@ def get_expenses(db: Session = Depends(get_db)):
     return result
 
 # Receipt upload with OCR
-@app.post("/expenses/receipt")
+@app.post("/expenses/receipt", dependencies=[Depends(verify_pin)])
 async def create_expense_from_receipt(
     file: UploadFile = File(...),
     paid_by: int = Form(...),
@@ -199,7 +224,7 @@ async def create_expense_from_receipt(
     return {"expense_id": db_expense.id, "amount": amount, "filepath": filepath}
 
 # Balance calculation
-@app.get("/balance")
+@app.get("/balance", dependencies=[Depends(verify_pin)])
 def get_balance(db: Session = Depends(get_db)):
     """Calculate who owes whom"""
     users = db.query(User).all()
@@ -246,7 +271,7 @@ def get_balance(db: Session = Depends(get_db)):
     return {"detailed": balances, "simplified": simplified}
 
 # Settle up
-@app.post("/settle")
+@app.post("/settle", dependencies=[Depends(verify_pin)])
 def settle_up(settlement: SettlementCreate, db: Session = Depends(get_db)):
     db_settlement = Settlement(
         from_user=settlement.from_user,
@@ -258,7 +283,7 @@ def settle_up(settlement: SettlementCreate, db: Session = Depends(get_db)):
     return {"status": "settled", "amount": settlement.amount}
 
 # Stats
-@app.get("/stats")
+@app.get("/stats", dependencies=[Depends(verify_pin)])
 def get_stats(db: Session = Depends(get_db)):
     total = db.query(func.sum(Expense.amount)).scalar() or 0
     by_category = db.query(

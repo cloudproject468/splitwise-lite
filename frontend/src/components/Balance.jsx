@@ -2,8 +2,10 @@ import { useState } from 'react'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 
-export default function Balance({ balance, users, onSettle }) {
+export default function Balance({ balance, users, onSettle, pin }) {
   const [settling, setSettling] = useState(false)
+
+  const headers = { 'X-Budget-Pin': pin, 'Content-Type': 'application/json' }
 
   if (!balance || !balance.simplified) {
     return <div className="text-slate-400 text-center">Loading...</div>
@@ -15,7 +17,7 @@ export default function Balance({ balance, users, onSettle }) {
     setSettling(true)
     await fetch(`${API}/settle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ from_user: fromId, to_user: toId, amount })
     })
     setSettling(false)

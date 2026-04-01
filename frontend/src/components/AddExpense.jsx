@@ -1,18 +1,29 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 
 const CATEGORIES = ['groceries', 'dining', 'utilities', 'transport', 'entertainment', 'other']
 
-export default function AddExpense({ users, onAdd }) {
+export default function AddExpense({ users, onAdd, pin }) {
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('other')
-  const [paidBy, setPaidBy] = useState(users[0]?.id || '')
+  const [paidBy, setPaidBy] = useState('')
   const [splitWith, setSplitWith] = useState([])
   const [loading, setLoading] = useState(false)
   const [receiptMode, setReceiptMode] = useState(false)
   const fileRef = useRef()
+
+  const headers = { 'X-Budget-Pin': pin }
+
+  // Sync paidBy with users when they load
+  useEffect(() => {
+    if (users.length > 0 && !paidBy) {
+      setPaidBy(String(users[0].id))
+    }
+  }, [users])
+
+  const paidByNum = parseInt(paidBy)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -21,12 +32,12 @@ export default function AddExpense({ users, onAdd }) {
     setLoading(true)
     await fetch(`${API}/expenses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: parseFloat(amount),
         description,
         category,
-        paid_by: parseInt(paidBy),
+        paid_by: paidByNum,
         split_with: splitWith.map(Number)
       })
     })
@@ -50,6 +61,7 @@ export default function AddExpense({ users, onAdd }) {
 
     const res = await fetch(`${API}/expenses/receipt`, {
       method: 'POST',
+      headers,
       body: formData
     })
     const data = await res.json()
@@ -70,6 +82,14 @@ export default function AddExpense({ users, onAdd }) {
       setSplitWith([...splitWith, userId])
     }
   }
+
+  // Clear splitWith if selected user becomes the payer
+  const handlePaidByChange = (newPaidBy) => {
+    setPaidBy(newPaidBy)
+    setSplitWith(splitWith.filter(id => id !== parseInt(newPaidBy)))
+  }
+
+  const otherUsers = users.filter(u => u.id !== paidByNum)
 
   return (
     <div className="space-y-4">
@@ -124,7 +144,7 @@ export default function AddExpense({ users, onAdd }) {
             <label className="text-sm text-slate-400">Paid by</label>
             <select
               value={paidBy}
-              onChange={e => setPaidBy(e.target.value)}
+              onChange={e => handlePaidByChange(e.target.value)}
               className="w-full bg-slate-800 rounded-lg p-3 mt-1"
             >
               {users.map(u => (
@@ -136,7 +156,7 @@ export default function AddExpense({ users, onAdd }) {
           <div>
             <label className="text-sm text-slate-400">Split with</label>
             <div className="flex gap-2 mt-1">
-              {users.filter(u => u.id !== parseInt(paidBy)).map(u => (
+              {otherUsers.map(u => (
                 <button
                   key={u.id}
                   type="button"
@@ -165,7 +185,7 @@ export default function AddExpense({ users, onAdd }) {
             <label className="text-sm text-slate-400">Paid by</label>
             <select
               value={paidBy}
-              onChange={e => setPaidBy(e.target.value)}
+              onChange={e => handlePaidByChange(e.target.value)}
               className="w-full bg-slate-800 rounded-lg p-3 mt-1"
             >
               {users.map(u => (
@@ -177,7 +197,7 @@ export default function AddExpense({ users, onAdd }) {
           <div>
             <label className="text-sm text-slate-400">Split with</label>
             <div className="flex gap-2 mt-1">
-              {users.filter(u => u.id !== parseInt(paidBy)).map(u => (
+              {otherUsers.map(u => (
                 <button
                   key={u.id}
                   type="button"
