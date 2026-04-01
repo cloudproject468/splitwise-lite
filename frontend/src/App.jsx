@@ -45,7 +45,7 @@ function App() {
   // Try stored PIN on mount
   useEffect(() => {
     if (pin) {
-      fetch(`${API}/auth/verify`, { headers: { 'X-Budget-Pin': pin } })
+      fetch(`${API}/auth/verify`, { method: 'POST', headers: { 'X-Budget-Pin': pin } })
         .then(res => {
           if (res.ok) {
             setAuthed(true)
@@ -68,6 +68,7 @@ function App() {
     setPinError('')
     try {
       const res = await fetch(`${API}/auth/verify`, {
+        method: 'POST',
         headers: { 'X-Budget-Pin': pinInput }
       })
       if (res.ok) {
